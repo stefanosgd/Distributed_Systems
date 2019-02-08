@@ -1,70 +1,30 @@
-// A Java program for a Client
-import java.net.*;
-import java.io.*;
 
-public class Client
-{
-    // initialize socket and input output streams
-    private Socket socket		 = null;
-    private DataInputStream input = null;
-    private DataOutputStream out	 = null;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
-    // constructor to put ip address and port
-    public Client(String address, int port)
-    {
-        // establish a connection
-        try
-        {
-            socket = new Socket(address, port);
-            System.out.println("Connected");
+public class Client {
 
-            // takes input from terminal
-            input = new DataInputStream(System.in);
+    private Client() {}
 
-            // sends output to the socket
-            out = new DataOutputStream(socket.getOutputStream());
-        }
-        catch(UnknownHostException u)
-        {
-            System.out.println(u);
-        }
-        catch(IOException i)
-        {
-            System.out.println(i);
-        }
+    public static void main(String[] args) {
 
-        // string to read message from input
-        String line = "";
+	String host = (args.length < 1) ? null : args[0];
+	try {
 
-        // keep reading until "Over" is input
-        while (!line.equals("Over"))
-        {
-            try
-            {
-                line = input.readLine();
-                out.writeUTF(line);
-            }
-            catch(IOException i)
-            {
-                System.out.println(i);
-            }
-        }
+	    // Get registry
+	    Registry registry = LocateRegistry.getRegistry("localhost", 5000);
 
-        // close the connection
-        try
-        {
-            input.close();
-            out.close();
-            socket.close();
-        }
-        catch(IOException i)
-        {
-            System.out.println(i);
-        }
-    }
+	    // Lookup the remote object "Hello" from registry
+	    // and create a stub for it
+	    ServerInterface stub = (ServerInterface) registry.lookup("Hello");
 
-    public static void main(String args[])
-    {
-        Client client = new Client("127.0.0.1", 5000);
+	    // Invoke a remote method
+	    String response = stub.sayHello();
+	    System.out.println("response: " + response);
+
+	} catch (Exception e) {
+		System.err.println("Client exception: " + e.toString());
+		e.printStackTrace();
+	}
     }
 }

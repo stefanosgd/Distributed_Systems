@@ -1,62 +1,35 @@
-// A Java program for a Server
-import java.net.*;
-import java.io.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
+	
+public class Server implements ServerInterface {
 
-public class Server
-{
-    //initialize socket and input stream
-    private Socket		 socket = null;
-    private ServerSocket server = null;
-    private DataInputStream in	 = null;
+    public Server() { }
 
-    // constructor with port
-    public Server(int port)
-    {
-        // starts server and waits for a connection
-        try
-        {
-            server = new ServerSocket(port);
-            System.out.println("Server started");
-
-            System.out.println("Waiting for a client ...");
-
-            socket = server.accept();
-            System.out.println("Client accepted");
-
-            // takes input from the client socket
-            in = new DataInputStream(
-                    new BufferedInputStream(socket.getInputStream()));
-
-            String line = "";
-
-            // reads message from client until "Over" is sent
-            while (!line.equals("Over"))
-            {
-                try
-                {
-                    line = in.readUTF();
-                    System.out.println(line);
-
-                }
-                catch(IOException i)
-                {
-                    System.out.println(i);
-                }
-            }
-            System.out.println("Closing connection");
-
-            // close connection
-            socket.close();
-            in.close();
-        }
-        catch(IOException i)
-        {
-            System.out.println(i);
-        }
+    public String sayHello() {
+	return "Sucessful remote invocation!";
     }
+	
+    public static void main(String args[]) {
+	
+	try {
+	    // Create server object
+	    Server obj = new Server();
 
-    public static void main(String args[])
-    {
-        Server server = new Server(5000);
+	    // Create remote object stub from server object
+	    ServerInterface stub = (ServerInterface) UnicastRemoteObject.exportObject(obj, 0);
+
+	    // Get registry
+	    Registry registry = LocateRegistry.getRegistry("localhost", 5000);
+
+	    // Bind the remote object's stub in the registry
+	    registry.bind("Hello", stub);
+
+	    // Write ready message to console
+	    System.err.println("Server ready");
+	} catch (Exception e) {
+	    System.err.println("Server exception: " + e.toString());
+	    e.printStackTrace();
+	}
     }
 }
