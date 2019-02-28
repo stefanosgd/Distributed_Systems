@@ -1,10 +1,17 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.math.BigInteger;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 
 public class GossipServer implements GossipInterface {
@@ -12,6 +19,9 @@ public class GossipServer implements GossipInterface {
     static private HashMap<Integer, HashMap<Integer, Double>> movieRatings = new HashMap<>();
     private int id;
     private GossipStatus status;
+    private List<List<String>> logs = new ArrayList<>();
+    private static HashMap<GossipInterface, GossipStatus> gossipServers = new HashMap<>();
+
 
     public GossipServer(int ID) {
         this.id = ID;
@@ -58,6 +68,10 @@ public class GossipServer implements GossipInterface {
         }
     }
 
+    public List<List<String>> getLogsList(){
+        return logs;
+    }
+
     public Double getRatings(String title) {
         if (movies.containsKey(title)) {
             int movieID = movies.get(title);
@@ -67,6 +81,7 @@ public class GossipServer implements GossipInterface {
                 total += rating;
                 count += 1;
             }
+            logs.add(new ArrayList<String>(Arrays.asList(Integer.toString(id), "GR-"+movieID, Long.toString(new Timestamp(System.currentTimeMillis()).getTime()))));
             return total/count;
         }
         else {
@@ -97,11 +112,78 @@ public class GossipServer implements GossipInterface {
                 return "Rating not added as this user has already submitted a rating for this movie! Try update instead.";
             } else {
                 movieRatings.get(movieID).put(ID, rating);
+                logs.add(new ArrayList<String>(Arrays.asList(Integer.toString(id), "SR-"+ Integer.toString(ID), Long.toString(new Timestamp(System.currentTimeMillis()).getTime()), Double.toString(rating))));
                 return "Rating added";
             }
         }
         else {
             return "Rating not added as this movie does not exist!";
+        }
+    }
+
+
+    public void gossip(){
+        try{
+            // Get the logs from the other servers
+            // Join them together and order them according to timestamp
+            // Make the changes required
+
+            int lOld = 0;
+            for (GossipInterface server : gossipServers.keySet()) {
+                List<List<String>> other = server.getLogsList();
+                int o = 0;
+                int l = 0;
+                List<List<String>> combLogs = new ArrayList<>();
+                while(true){
+                    //Need to check for both being equal to size
+                    if (l == logs.size() && o < other.size()){
+                        combLogs.addAll(other.subList(o, other.size()));
+                        logs = combLogs;
+                        break;
+                    } else if (o == other.size() && l < logs.size()) {
+                        combLogs.addAll(logs.subList(l, logs.size()));
+                        logs = combLogs;
+                        break;
+                    } else if (o < other.size() && l < logs.size()) {
+                        //attempt to interleave the logs on this server and others here to create joint dataset
+                        if ((new BigInteger(logs.get(l).get(2))).compareTo((new BigInteger(other.get(o).get(2)))) == 1){
+                            combLogs.add(other.get(o));
+                            o+=1;
+                        } else if ((new BigInteger(logs.get(l).get(2))).compareTo((new BigInteger(other.get(o).get(2)))) == -1){
+                            combLogs.add(logs.get(l));
+                            l+=1;
+                        } else {
+                            combLogs.add(logs.get(l));
+                            o+=1;
+                            l+=1;
+                        }
+                    } else {
+                        break;
+                    }
+
+                }
+                //smartCombine(movies, servers.get(i).getMoviesList());
+                logs = combLogs;
+                //Now we have the logs in the right order need to edit data to fit the logs.
+                //data being added repeatedly because same logs are being viewed again and again
+//                for(int j = 0; j < logs.size(); j++){
+//                    if(Integer.parseInt(logs.get(j).get(0)) != id && logs.get(j).get(1).contains("SR")){
+//                        String movieIDGiven = logs.get(j).get(1).split("-")[1];
+//                        String ratingGiven = logs.get(j).get(3);
+//                        String ts = logs.get(j).get(2);
+//                        //Check the list equality as below and this should work.
+//                        if ((new ArrayList<>(Arrays.asList(movieIDGiven, ratingGiven, ts))).equals(movieRatings.get(ratings.size()-1))){
+//                            continue;
+//                        } else {
+//                            ratings.add(new ArrayList<>(Arrays.asList(movieIDGiven, ratingGiven, ts)));
+//                        }
+//                    }
+//                }
+
+            }
+            //System.out.println(ratings.get(ratings.size()-1));
+        } catch(RemoteException e){
+            e.printStackTrace();
         }
     }
 
@@ -127,6 +209,17 @@ public class GossipServer implements GossipInterface {
 
             // Write ready message to console
             System.err.println("Server ready");
+
+            while(true){
+                try{
+                    TimeUnit.SECONDS.sleep(1);
+                } catch (Exception e) {
+                    System.out.println("exception :" + e.getMessage());
+                }
+                stub1.gossip();
+                stub2.gossip();
+                stub3.gossip();
+            }
         } catch (Exception e) {
             System.err.println("Server exception: " + e.toString());
             e.printStackTrace();
