@@ -4,6 +4,7 @@ import java.util.List;
 
 public interface GossipInterface extends Remote {
     void readData() throws RemoteException;
+    void setStatus(GossipStatus newStatus) throws RemoteException;
     GossipStatus getStatus() throws RemoteException;
     Double getRatings(String title) throws RemoteException;
     String updateRatings(String title, Integer userID, Double movieRating) throws RemoteException;

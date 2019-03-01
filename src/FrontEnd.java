@@ -10,74 +10,87 @@ public class FrontEnd implements FrontEndInterface {
     }
 
     private static HashMap<GossipInterface, GossipStatus> gossipServers = new HashMap<>();
+    private static GossipInterface currentServer;
     // Variable of current GossipServer index
     // If server is overloaded, temporarily choose a new GossipServer and then go back.
     // If the server goes offline, then you will choose a new constant GossipServer (modulo len)
     //
 
-    public String getMovieRating(String title) {
+    public GossipInterface serverConnection() {
         // If current is online, use that
         // Else If overloaded try a new one temp
         // Else If offline, change current
-
         int attempts = 0;
-            while (attempts < 4) {
+        while (attempts < 4) {
+            if (gossipServers.get(currentServer) == GossipStatus.ACTIVE) {
+                return currentServer;
+            }
+            else if (gossipServers.get(currentServer) == GossipStatus.OVERLOADED) {
                 for (GossipInterface server : gossipServers.keySet()) {
-                    if (gossipServers.get(server) == GossipStatus.ACTIVE) {
-                //
-                        try {
-                            Double response = server.getRatings(title);
-                            if (response != null) {
-                                String formattedResponse = new DecimalFormat("#.00").format(response);
-                                return "Rating: " + formattedResponse;
-                            } else {
-                                return "This movie does not exist in the system.";
-                            }
-                        } catch (Exception e) {
-                            return "Client exception: " + e.toString();
-//                        e.printStackTrace();
-                        }
+                    if (gossipServers.get(server) == GossipStatus.ACTIVE && server != currentServer) {
+                        return server;
                     }
                 }
-                attempts += 1;
+            }
+            else {
+                for (GossipInterface server : gossipServers.keySet()) {
+                    if (gossipServers.get(server) == GossipStatus.ACTIVE && server != currentServer) {
+                        currentServer = server;
+                        return currentServer;
+                    }
+                }
+            }
+            attempts += 1;
         }
-        return "Unable to connect";
+        return null;
+    }
+
+    public String getMovieRating(String title) {
+        GossipInterface using = serverConnection();
+        if (using == null) {
+            return "There was an error connecting to the server";
+        } else {
+            try {
+                Double response = using.getRatings(title);
+                if (response != null) {
+                    String formattedResponse = new DecimalFormat("#.00").format(response);
+                    return "Rating: " + formattedResponse;
+                } else {
+                    return "This movie does not exist in the system.";
+                }
+            } catch (Exception e) {
+                return "Client exception: " + e.toString();
+//                e.printStackTrace();
+            }
+        }
     }
 
     public String submitMovieRating(String title, Integer userID, Double userRating) {
-        int attempts = 0;
-        while (attempts < 4) {
-            for (GossipInterface server : gossipServers.keySet()) {
-                if (gossipServers.get(server) == GossipStatus.ACTIVE) {
-                    try {
-                        return server.submitRatings(title, userID, userRating);
-                    } catch (Exception e) {
-                        return "Client exception: " + e.toString();
-//                        e.printStackTrace();
-                    }
-                }
+        GossipInterface using = serverConnection();
+        if (using == null) {
+            return "There was an error connecting to the server";
+        } else {
+            try {
+                return using.submitRatings(title, userID, userRating);
+            } catch (Exception e) {
+                return "Client exception: " + e.toString();
+//                e.printStackTrace();
             }
-            attempts += 1;
         }
-        return "Unable to connect";
     }
 
     public String updateMovieRating(String title, Integer userID, Double userRating) {
-        int attempts = 0;
-        while (attempts < 4) {
-            for (GossipInterface server : gossipServers.keySet()) {
-                if (gossipServers.get(server) == GossipStatus.ACTIVE) {
-                    try {
-                        return server.updateRatings(title, userID, userRating);
-                    } catch (Exception e) {
-                        return "Client exception: " + e.toString();
+        GossipInterface using = serverConnection();
+        if (using == null) {
+            return "There was an error connecting to the server";
+        } else {
+            try {
+                return using.updateRatings(title, userID, userRating);
+            } catch (Exception e) {
+                return "Client exception: " + e.toString();
 //                        e.printStackTrace();
-                    }
-                }
             }
-            attempts += 1;
         }
-        return "Unable to connect";
     }
 
     public static void main(String[] args) {
@@ -100,6 +113,7 @@ public class FrontEnd implements FrontEndInterface {
             gossipServers.put(stub1, GossipStatus.ACTIVE);
             gossipServers.put(stub2, GossipStatus.ACTIVE);
             gossipServers.put(stub3, GossipStatus.ACTIVE);
+            currentServer = stub1;
         } catch (Exception g) {
             System.err.println("Client exception: " + g.toString());
             g.printStackTrace();

@@ -5,10 +5,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 
@@ -18,7 +15,7 @@ public class GossipServer implements GossipInterface {
     private int id;
     private GossipStatus status;
     private List<List<String>> logs = new ArrayList<>();
-//    private static HashMap<GossipInterface, GossipStatus> gossipServers = new HashMap<>();
+    private static HashMap<Integer, GossipInterface> gossipServers = new HashMap<>();
     private int timestamp;
     private HashMap<Integer, Integer> sharedTimestamp = new HashMap<>();
     // integer(?) own timestamp
@@ -34,11 +31,16 @@ public class GossipServer implements GossipInterface {
             }
         }
         status = GossipStatus.ACTIVE;
+        gossipServers.put(this.id, this);
         readData();
     }
 
     public GossipStatus getStatus() {
         return this.status;
+    }
+
+    public void setStatus (GossipStatus newStatus) {
+        this.status = newStatus;
     }
 
     public void readData(){
@@ -94,6 +96,15 @@ public class GossipServer implements GossipInterface {
     }
 
     public Double getRatings(String title) {
+        try {
+            while (((this.sharedTimestamp.get((this.id + 1) % 3) != this.timestamp) || (gossipServers.get((this.id + 1) % 3).getStatus() != GossipStatus.OFFLINE)) &&
+                   ((this.sharedTimestamp.get((this.id + 2) % 3) != this.timestamp) || (gossipServers.get((this.id + 2) % 3).getStatus() != GossipStatus.OFFLINE))) {
+                // Waiting to gossip and update before querying
+            }
+        } catch (Exception e) {
+            System.err.println("Server exception: " + e.toString());
+            e.printStackTrace();
+        }
         // Check the list of other servers and make sure that it is up to date with f+1 of them
         // While timestamps don't match don't do anything
         if (this.movies.containsKey(title)) {
@@ -212,6 +223,40 @@ public class GossipServer implements GossipInterface {
 //        }
     }
 
+//    private void changingStatus(GossipInterface server) {
+//        if (Math.random() < 0.05) {
+//            server.setStatus(GossipStatus.OFFLINE);
+//        }
+//        if (Math.random() < 0.1) {
+//            server.setStatus(GossipStatus.OVERLOADED);
+//        } else {
+//            if (Math.random() < 0.15) {
+//                server.setStatus(GossipStatus.ACTIVE);
+//            }
+//        }
+//    }
+
+    public static void changingStatus(GossipInterface server) {
+        try {
+            if (server.getStatus() == GossipStatus.ACTIVE) {
+                if (Math.random() < 0.1) {
+                    server.setStatus(GossipStatus.OVERLOADED);
+                }
+                else if (Math.random() < 0.05) {
+                    server.setStatus(GossipStatus.OFFLINE);
+                }
+            }
+            else {
+                if (Math.random() < 0.25) {
+                    server.setStatus(GossipStatus.ACTIVE);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Server exception: " + e.toString());
+            e.printStackTrace();
+        }
+    }
+
     public static void main(String args[]) {
         try {
             // Create server object
@@ -237,21 +282,25 @@ public class GossipServer implements GossipInterface {
 
             while(true){
                 try{
-                    TimeUnit.SECONDS.sleep(5);
+                    TimeUnit.SECONDS.sleep(3);
                 } catch (Exception e) {
                     System.out.println("exception :" + e.getMessage());
                 }
                 if (stub1.getStatus() != GossipStatus.OFFLINE) {
                     stub1.gossip();
                 }
+                changingStatus(stub1);
                 if (stub2.getStatus() != GossipStatus.OFFLINE) {
                     stub2.gossip();
                 }
+                changingStatus(stub2);
                 if (stub3.getStatus() != GossipStatus.OFFLINE) {
                     stub3.gossip();
                 }
-//                stub2.gossip();
-//                stub3.gossip();
+                changingStatus(stub3);
+                for (int i : gossipServers.keySet()) {
+                    System.out.println(gossipServers.get(i).getStatus());
+                }
             }
         } catch (Exception e) {
             System.err.println("Server exception: " + e.toString());
