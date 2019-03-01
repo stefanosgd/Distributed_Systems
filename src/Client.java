@@ -22,36 +22,39 @@ public class Client {
             String movieTitle;
             int userID;
             double rating;
+            String userChoice;
             while (connected) {
                 System.out.println("What would you like to do?");
                 System.out.println("(V)iew a rating?");
                 System.out.println("(U)pdate a rating?");
                 System.out.println("(A)dd a rating?");
                 System.out.println("(Q)uit?");
-                String userChoice = scan.nextLine();
+                userChoice = scan.nextLine();
                 switch (userChoice.toUpperCase()) {
                     case "V":
                         System.out.println("Enter the title of the movie you want to get the rating for:");
                         movieTitle = scan.nextLine();
-                        stub1.getMovieRating(movieTitle);
+                        System.out.println(stub1.getMovieRating(movieTitle));
                         break;
                     case "U":
                         System.out.println("Enter the title of the movie you want to update the rating for:");
                         movieTitle = scan.nextLine();
-                        System.out.println("Enter the user ID you want to update with");
+                        System.out.println("Enter your user ID:");
                         userID = scan.nextInt();
                         System.out.println("Enter the new rating");
                         rating = scan.nextDouble();
-                        stub1.updateMovieRating(movieTitle, userID, rating);
+                        System.out.println(stub1.updateMovieRating(movieTitle, userID, rating));
+                        userChoice = scan.nextLine();
                         break;
                     case "A":
                         System.out.println("Enter the title of the movie you want to add the rating for");
-                        movieTitle = scan.next();
-                        System.out.println("Enter the user ID you want to add with");
+                        movieTitle = scan.nextLine();
+                        System.out.println("Enter your user ID:");
                         userID = scan.nextInt();
                         System.out.println("Enter the new rating");
                         rating = scan.nextDouble();
-                        stub1.submitMovieRating(movieTitle, userID, rating);
+                        System.out.println(stub1.submitMovieRating(movieTitle, userID, rating));
+                        userChoice = scan.nextLine();
                         break;
                     case "Q":
                         connected = false;
