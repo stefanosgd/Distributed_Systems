@@ -1,11 +1,12 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.sql.Timestamp;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 
@@ -14,7 +15,8 @@ public class GossipServer implements GossipInterface {
     private HashMap<Integer, HashMap<Integer, Double>> movieRatings = new HashMap<>();
     private int id;
     private GossipStatus status;
-    private List<List<String>> logs = new ArrayList<>();
+//    private List<List<String>> logs = new ArrayList<>();
+    private ArrayList<String> logs = new ArrayList<>();
     private static HashMap<Integer, GossipInterface> gossipServers = new HashMap<>();
     private int timestamp;
     private HashMap<Integer, Integer> sharedTimestamp = new HashMap<>();
@@ -24,8 +26,10 @@ public class GossipServer implements GossipInterface {
 
     public GossipServer(int ID) {
         this.id = ID;
-        this.timestamp = 0;
-        for (int i=1; i<4; i++) {
+        this.timestamp = 1;
+//        this.logs.put(this.timestamp, "Started up");
+//        timestamp += 1;
+        for (int i=0; i<3; i++) {
             if (i != this.id) {
                 this.sharedTimestamp.put(i, this.timestamp);
             }
@@ -91,19 +95,22 @@ public class GossipServer implements GossipInterface {
         }
     }
 
-    public List<List<String>> getLogsList(){
-        return logs;
+    public ArrayList<String> getLogsList(){
+        return this.logs;
     }
 
     public Double getRatings(String title) {
         try {
-            while (((this.sharedTimestamp.get((this.id + 1) % 3) != this.timestamp) || (gossipServers.get((this.id + 1) % 3).getStatus() != GossipStatus.OFFLINE)) &&
-                   ((this.sharedTimestamp.get((this.id + 2) % 3) != this.timestamp) || (gossipServers.get((this.id + 2) % 3).getStatus() != GossipStatus.OFFLINE))) {
+            System.out.println(this.id);
+            while (((this.sharedTimestamp.get((this.id + 1) % 3) != this.timestamp) && (gossipServers.get((this.id + 1) % 3).getStatus() != GossipStatus.OFFLINE)) ||
+                   ((this.sharedTimestamp.get((this.id + 2) % 3) != this.timestamp) && (gossipServers.get((this.id + 2) % 3).getStatus() != GossipStatus.OFFLINE))) {
                 // Waiting to gossip and update before querying
+//                System.out.println("Waiting");
             }
         } catch (Exception e) {
             System.err.println("Server exception: " + e.toString());
             e.printStackTrace();
+            return null;
         }
         // Check the list of other servers and make sure that it is up to date with f+1 of them
         // While timestamps don't match don't do anything
@@ -115,7 +122,7 @@ public class GossipServer implements GossipInterface {
                 total += rating;
                 count += 1;
             }
-            this.logs.add(new ArrayList<String>(Arrays.asList(Integer.toString(id), "GR-"+movieID, Long.toString(new Timestamp(System.currentTimeMillis()).getTime()))));
+//            this.timestamp += 1;
             return total/count;
         }
         else {
@@ -128,7 +135,10 @@ public class GossipServer implements GossipInterface {
             int movieID = this.movies.get(title);
             if (this.movieRatings.get(movieID).containsKey(ID)) {
                 this.movieRatings.get(movieID).put(ID, rating);
-                return "Rating added";
+                this.logs.add(this.id + "," + this.timestamp+ "," + movieID + "," + ID+ ","+ rating);
+                this.timestamp += 1;
+//                this.logs.add(new ArrayList<String>(Arrays.asList(Integer.toString(this.id), ",", Integer.toString(this.timestamp), ",", "UR-"+ Integer.toString(ID), ",", Double.toString(rating))));
+                return "Rating updated";
             }
             else {
                 return "Rating not updated as this user has not yet submitted a rating for this movie! Try submit instead.";
@@ -145,8 +155,11 @@ public class GossipServer implements GossipInterface {
             if (this.movieRatings.get(movieID).containsKey(ID)) {
                 return "Rating not added as this user has already submitted a rating for this movie! Try update instead.";
             } else {
-                this.movieRatings.get(movieID).put(ID, rating);
-                this.logs.add(new ArrayList<String>(Arrays.asList(Integer.toString(id), "SR-"+ Integer.toString(ID), Long.toString(new Timestamp(System.currentTimeMillis()).getTime()), Double.toString(rating))));
+                this.movieRatings.get(movieID).putIfAbsent(ID, rating);
+//                this.logs.add(new ArrayList<String>(Arrays.asList(Integer.toString(id), "SR-"+ Integer.toString(ID), Long.toString(new Timestamp(System.currentTimeMillis()).getTime()), Double.toString(rating))));
+//                this.logs.put(this.timestamp, (this.id)+ ","+ (this.timestamp)+ ","+ "SR-"+ (ID)+ ","+ (rating));
+                this.logs.add(this.id + "," + this.timestamp+ "," + movieID + "," + ID+ ","+ rating);
+                this.timestamp += 1;
                 return "Rating added";
             }
         }
@@ -155,86 +168,45 @@ public class GossipServer implements GossipInterface {
         }
     }
 
+    public void exchangeGossip(GossipInterface otherServer, int otherID) {
+        try {
+                // Do the actions in the log file you got from the other server
+            ArrayList<String> otherLog = otherServer.getLogsList();
+            System.out.println(otherLog);
+            for (String i : otherLog) {
+                if (!this.logs.contains(i)) {
+                    String[] logInstructions = i.split(",");
+                    this.movieRatings.get(Integer.parseInt(logInstructions[2])).put(Integer.parseInt(logInstructions[3]), Double.parseDouble(logInstructions[4]));
+                    this.logs.add(i);
+                }
+            }
+            // Update when you last gossiped with this server
+            this.sharedTimestamp.put(otherID, this.timestamp);
+        } catch (Exception e) {
+            System.err.println("Server exception: " + e.toString());
+            e.printStackTrace();
+        }
+    }
 
     public void gossip(){
-//        try{
+        try{
             // Randomly pick a server to gossip with (Provided they are online/overloaded)
             // Get the logs from the other servers
             // Join them together and order them according to timestamp
             // Make the changes required
-
-//            int lOld = 0;
-//            for (GossipInterface server : gossipServers.keySet()) {
-//                List<List<String>> other = server.getLogsList();
-//                int o = 0;
-//                int l = 0;
-//                List<List<String>> combLogs = new ArrayList<>();
-//                while(true){
-//                    //Need to check for both being equal to size
-//                    if (l == logs.size() && o < other.size()){
-//                        combLogs.addAll(other.subList(o, other.size()));
-//                        logs = combLogs;
-//                        break;
-//                    } else if (o == other.size() && l < logs.size()) {
-//                        combLogs.addAll(logs.subList(l, logs.size()));
-//                        logs = combLogs;
-//                        break;
-//                    } else if (o < other.size() && l < logs.size()) {
-//                        //attempt to interleave the logs on this server and others here to create joint dataset
-//                        if ((new BigInteger(logs.get(l).get(2))).compareTo((new BigInteger(other.get(o).get(2)))) == 1){
-//                            combLogs.add(other.get(o));
-//                            o+=1;
-//                        } else if ((new BigInteger(logs.get(l).get(2))).compareTo((new BigInteger(other.get(o).get(2)))) == -1){
-//                            combLogs.add(logs.get(l));
-//                            l+=1;
-//                        } else {
-//                            combLogs.add(logs.get(l));
-//                            o+=1;
-//                            l+=1;
-//                        }
-//                    } else {
-//                        break;
-//                    }
-//
-//                }
-                System.out.println("Hello?");
-                //smartCombine(movies, servers.get(i).getMoviesList());
-//                logs = combLogs;
-                //Now we have the logs in the right order need to edit data to fit the logs.
-                //data being added repeatedly because same logs are being viewed again and again
-//                for(int j = 0; j < logs.size(); j++){
-//                    if(Integer.parseInt(logs.get(j).get(0)) != id && logs.get(j).get(1).contains("SR")){
-//                        String movieIDGiven = logs.get(j).get(1).split("-")[1];
-//                        String ratingGiven = logs.get(j).get(3);
-//                        String ts = logs.get(j).get(2);
-//                        //Check the list equality as below and this should work.
-//                        if ((new ArrayList<>(Arrays.asList(movieIDGiven, ratingGiven, ts))).equals(movieRatings.get(ratings.size()-1))){
-//                            continue;
-//                        } else {
-//                            ratings.add(new ArrayList<>(Arrays.asList(movieIDGiven, ratingGiven, ts)));
-//                        }
-//                    }
-//                }
-
-//            }
-            //System.out.println(ratings.get(ratings.size()-1));
-//        } catch(RemoteException e){
-//            e.printStackTrace();
-//        }
+            int gossipID1 = (this.id+1) % 3;
+            int gossipID2 = (this.id+2) % 3;
+            if (Math.random() <= 0.5 && gossipServers.get(gossipID1).getStatus() != GossipStatus.OFFLINE) {
+                exchangeGossip(gossipServers.get(gossipID1), gossipID1);
+            }
+            else if (gossipServers.get(gossipID2).getStatus() != GossipStatus.OFFLINE) {
+                exchangeGossip(gossipServers.get(gossipID2), gossipID2);
+            }
+        } catch(RemoteException e){
+            e.printStackTrace();
+        }
     }
 
-//    private void changingStatus(GossipInterface server) {
-//        if (Math.random() < 0.05) {
-//            server.setStatus(GossipStatus.OFFLINE);
-//        }
-//        if (Math.random() < 0.1) {
-//            server.setStatus(GossipStatus.OVERLOADED);
-//        } else {
-//            if (Math.random() < 0.15) {
-//                server.setStatus(GossipStatus.ACTIVE);
-//            }
-//        }
-//    }
 
     public static void changingStatus(GossipInterface server) {
         try {
@@ -260,9 +232,9 @@ public class GossipServer implements GossipInterface {
     public static void main(String args[]) {
         try {
             // Create server object
-            GossipServer GS1 = new GossipServer(1);
-            GossipServer GS2 = new GossipServer(2);
-            GossipServer GS3 = new GossipServer(3);
+            GossipServer GS1 = new GossipServer(0);
+            GossipServer GS2 = new GossipServer(1);
+            GossipServer GS3 = new GossipServer(2);
 
             // Create remote object stub from server object
             GossipInterface stub1 = (GossipInterface) UnicastRemoteObject.exportObject(GS1, 0);
@@ -289,14 +261,15 @@ public class GossipServer implements GossipInterface {
                 if (stub1.getStatus() != GossipStatus.OFFLINE) {
                     stub1.gossip();
                 }
-                changingStatus(stub1);
                 if (stub2.getStatus() != GossipStatus.OFFLINE) {
                     stub2.gossip();
                 }
-                changingStatus(stub2);
                 if (stub3.getStatus() != GossipStatus.OFFLINE) {
                     stub3.gossip();
                 }
+//                stub1.setStatus(GossipStatus.OFFLINE);
+                changingStatus(stub1);
+                changingStatus(stub2);
                 changingStatus(stub3);
                 for (int i : gossipServers.keySet()) {
                     System.out.println(gossipServers.get(i).getStatus());

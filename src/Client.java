@@ -30,37 +30,43 @@ public class Client {
                 System.out.println("(A)dd a rating?");
                 System.out.println("(Q)uit?");
                 userChoice = scan.nextLine();
-                switch (userChoice.toUpperCase()) {
-                    case "V":
-                        System.out.println("Enter the title of the movie you want to get the rating for:");
-                        movieTitle = scan.nextLine();
-                        System.out.println(stub1.getMovieRating(movieTitle));
-                        break;
-                    case "U":
-                        System.out.println("Enter the title of the movie you want to update the rating for:");
-                        movieTitle = scan.nextLine();
-                        System.out.println("Enter your user ID:");
-                        userID = scan.nextInt();
-                        System.out.println("Enter the new rating");
-                        rating = scan.nextDouble();
-                        System.out.println(stub1.updateMovieRating(movieTitle, userID, rating));
-                        userChoice = scan.nextLine();
-                        break;
-                    case "A":
-                        System.out.println("Enter the title of the movie you want to add the rating for");
-                        movieTitle = scan.nextLine();
-                        System.out.println("Enter your user ID:");
-                        userID = scan.nextInt();
-                        System.out.println("Enter the new rating");
-                        rating = scan.nextDouble();
-                        System.out.println(stub1.submitMovieRating(movieTitle, userID, rating));
-                        userChoice = scan.nextLine();
-                        break;
-                    case "Q":
-                        connected = false;
-                        break;
-                    default:
-                        break;
+                try {
+                    switch (userChoice.toUpperCase()) {
+                        case "V":
+                            System.out.println("Enter the title of the movie you want to get the rating for:");
+                            movieTitle = scan.nextLine();
+                            System.out.println(stub1.getMovieRating(movieTitle));
+                            break;
+                        case "U":
+                            System.out.println("Enter the title of the movie you want to update the rating for:");
+                            movieTitle = scan.nextLine();
+                            System.out.println("Enter your user ID:");
+                            userID = scan.nextInt();
+                            System.out.println("Enter the new rating");
+                            rating = scan.nextDouble();
+                            System.out.println(stub1.updateMovieRating(movieTitle, userID, rating));
+                            userChoice = scan.nextLine();
+                            break;
+                        case "A":
+                            System.out.println("Enter the title of the movie you want to add the rating for");
+                            movieTitle = scan.nextLine();
+                            System.out.println("Enter your user ID:");
+                            userID = scan.nextInt();
+                            System.out.println("Enter the new rating");
+                            rating = scan.nextDouble();
+                            System.out.println(stub1.submitMovieRating(movieTitle, userID, rating));
+                            userChoice = scan.nextLine();
+                            break;
+                        case "Q":
+                            connected = false;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                catch (Exception e) {
+                    System.err.println("Client exception: " + e.toString());
+                    e.printStackTrace();
                 }
             }
         } catch (Exception e) {//        System.out.println("Multiplied: " + response);
